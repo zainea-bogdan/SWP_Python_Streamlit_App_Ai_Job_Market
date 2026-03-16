@@ -9,3 +9,6 @@ This page is intended to:
     - M - BubbleChart: demand score x - annual salary y - demand_growth column bubble size - color is lLM color binary  
     - Interpretation section.
 """
+
+import streamlit as st
+st.balloons()

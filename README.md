@@ -2,6 +2,15 @@
 
 This repo serves as codebase for implementing and deploying a Streamlit application as part of the university couse called "Software Package".
 
+# Data Source Citing:
+
+[Link](https://www.kaggle.com/datasets/alitaqishah/ai-jobs-market-2025-2026-salaries)
+
+Principals Contributors:
+Ravio Global Salary Benchmark, Robert Half Technology Guide, LinkedIn Workforce Insights, and Glassdoor.
+
+For any issue with citing this source, please open an issue, and we will gladly review the citing method. Thanks!
+
 # Commits Code Rules:
 
 - DONE = if a feature is completely functional or not.
