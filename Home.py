@@ -42,7 +42,6 @@ focusing on projected salary trends, remote work availability, and the specific 
 on compensation across various industries.
 """)
 
-
 # defining a container, which is like a portion from the page where you can place the componenets as you wish in my case the first line is the title, then the second line is spli into 2 columns/cards with data into them
 with st.container():
     st.subheader("Data Source & Credentials")
