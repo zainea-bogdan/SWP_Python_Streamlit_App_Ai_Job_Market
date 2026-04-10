@@ -12,7 +12,19 @@ from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-from Home import load_data
+@st.cache_data
+def load_data():
+    file_path = "./EDA/ai_jobs_market_2025_2026.csv"
+    try:
+        return pd.read_csv(file_path)
+    except FileNotFoundError:
+        st.error(f"Fișierul '{file_path}' nu a fost găsit.")
+        return pd.DataFrame()
+
+df = load_data()
+
+if df.empty:
+    st.stop()
 
 st.set_page_config(page_title="Salary Regression Models", layout="wide")
 
