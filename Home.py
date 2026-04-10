@@ -16,6 +16,7 @@ This page is intended to:
 """
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
 # Page configuration
 st.set_page_config(page_title="AI Job Market 2025-2026 Overview", layout="wide")
@@ -105,7 +106,74 @@ desc_df = pd.DataFrame(list(column_descriptions.items()), columns=["Column Name"
 st.table(desc_df)
 
 #TO BE DONE: FILTER SELECT BOX  CA SA VEDEM HISTOGRAMA SI BOXPLOT PER COLOANA. - Analiza univariata.
-#Oke oke
+
+# Analiză univariată: histogramă + boxplot
+if not df.empty:
+    filter_column = st.selectbox("Select a column to visualize:", df.columns)
+    st.subheader(f"Distribuția pentru: `{filter_column}`")
+
+    series = df[filter_column].dropna()
+
+    if pd.api.types.is_numeric_dtype(series):
+        tab1, tab2 = st.tabs(["Histogramă", "Boxplot"])
+
+        with tab1:
+            bins = st.slider(
+                "Număr de intervale (bins)",
+                min_value=5,
+                max_value=60,
+                value=20,
+                step=1,
+                key="hist_bins"
+            )
+            fig_hist = px.histogram(
+                df,
+                x=filter_column,
+                nbins=bins,
+                title=f"Histogramă - {filter_column}",
+                opacity=0.85
+            )
+            fig_hist.update_layout(
+                bargap=0.05,
+                xaxis_title=filter_column,
+                yaxis_title="Frecvență"
+            )
+            st.plotly_chart(fig_hist, use_container_width=True)
+
+        with tab2:
+            fig_box = px.box(
+                df,
+                y=filter_column,
+                title=f"Boxplot - {filter_column}",
+                points="outliers"
+            )
+            fig_box.update_layout(yaxis_title=filter_column)
+            st.plotly_chart(fig_box, use_container_width=True)
+
+    else:
+        st.info("Boxplot este disponibil doar pentru coloane numerice.")
+        top_n = st.slider(
+            "Top categorii afișate",
+            min_value=5,
+            max_value=30,
+            value=10,
+            step=1,
+            key="cat_top_n"
+        )
+        vc = series.value_counts().head(top_n).reset_index()
+        vc.columns = [filter_column, "count"]
+
+        fig_bar = px.bar(
+            vc,
+            x=filter_column,
+            y="count",
+            title=f"Top {top_n} valori - {filter_column}"
+        )
+        fig_bar.update_layout(
+            xaxis_title=filter_column,
+            yaxis_title="Număr apariții"
+        )
+        st.plotly_chart(fig_bar, use_container_width=True)
 
 # 6. Analysis of Description Output (What is unusual)
 st.subheader("Analysis: What is unusual?")
