@@ -21,6 +21,7 @@ import plotly.express as px
 # Page configuration
 st.set_page_config(page_title="AI Job Market 2025-2026 Overview", layout="wide")
 
+
 # 1. Dataset Loading into Cache
 @st.cache_data
 def load_data():
