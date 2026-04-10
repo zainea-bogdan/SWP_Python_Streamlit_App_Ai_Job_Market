@@ -14,3 +14,10 @@ This page is intended to show the following:
     - Sunburst graphic to vizualise % of unique skills required per job title. 
     - Interpretation Sections with general conclusions.
 """
+
+import streamlit as st
+from Home import load_data
+st.balloons()
+
+df = load_data()
+st.dataframe(df.sample(10), use_container_width=True)

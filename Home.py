@@ -104,6 +104,9 @@ column_descriptions = {
 desc_df = pd.DataFrame(list(column_descriptions.items()), columns=["Column Name", "Description"])
 st.table(desc_df)
 
+#TO BE DONE: FILTER SELECT BOX  CA SA VEDEM HISTOGRAMA SI BOXPLOT PER COLOANA. - Analiza univariata.
+
+
 # 6. Analysis of Description Output (What is unusual)
 st.subheader("Analysis: What is unusual?")
 st.info("""

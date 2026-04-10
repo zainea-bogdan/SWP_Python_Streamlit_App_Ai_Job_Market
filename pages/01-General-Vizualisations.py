@@ -11,4 +11,8 @@ This page is intended to:
 """
 
 import streamlit as st
+from Home import load_data
 st.balloons()
+
+df = load_data()
+st.dataframe(df.sample(10), use_container_width=True)
