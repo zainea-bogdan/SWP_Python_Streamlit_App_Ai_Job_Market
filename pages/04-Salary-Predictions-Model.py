@@ -1,14 +1,9 @@
-"""
-Salary prediction page:
-- Linear Regression
-- Quadratic Regression
-- Comparison on test set
-"""
-
 import streamlit as st
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
+# Scikit-learn
 from sklearn.model_selection import train_test_split
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
@@ -21,56 +16,35 @@ from Home import load_data
 
 st.set_page_config(page_title="Salary Regression Models", layout="wide")
 
-
 # -------------------------
-# Helpers
+# 1. Precise Data Preparation
 # -------------------------
-def clean_skills(text):
-    if pd.isna(text):
-        return []
-    text = str(text).strip()
-    if not text:
-        return []
-    return [s.strip().lower() for s in text.split("|") if s.strip()]
-
-
 def prepare_dataset(df):
     df = df.copy()
-
-    # target
     target_col = "annual_salary_usd"
-    if target_col not in df.columns:
-        raise ValueError("Column 'annual_salary_usd' not found in dataset.")
-
-    # basic skill-derived feature
-    if "required_skills" in df.columns:
-        df["skills_list"] = df["required_skills"].apply(clean_skills)
-        df["skill_count"] = df["skills_list"].apply(len)
-    else:
-        df["skill_count"] = 0
-
-    # Drop obvious leakage / ID columns
-    drop_cols = [
-        "job_id",
-        "annual_salary_usd",
-        "salary_min_usd",
-        "salary_max_usd",
-        "salary_tier",
-        "required_skills",
-        "skills_list",
+    
+    # 1. Curated Features: Focused on high-impact drivers
+    selected_features = [
+        "years_of_experience", "education_required", "job_category", 
+        "is_llm_role", "ai_salary_premium_pct", "country", "city",
+        "company_size", "demand_score", "posting_month", "is_remote_friendly",
+        "remote_work", "industry", "job_title", "experience_level"
     ]
-
-    existing_drop_cols = [c for c in drop_cols if c in df.columns]
-    X = df.drop(columns=existing_drop_cols)
+    
+    # 2. Strict Leakage Prevention: Explicitly exclude salary categories/tiers
+    leakage_cols = ["salary_tier", "salary_category", "salary_min_usd", "salary_max_usd"]
+    
+    existing_cols = [c for c in selected_features if c in df.columns]
+    X = df[existing_cols].copy()
+    
+    # Ensure no leakage columns accidentally slipped into the feature set
+    X = X.drop(columns=[c for c in leakage_cols if c in X.columns])
+    
     y = df[target_col]
 
-    # remove rows with missing target
+    # Clean rows with missing target
     valid_idx = y.notna()
-    X = X.loc[valid_idx].copy()
-    y = y.loc[valid_idx].copy()
-
-    return X, y
-
+    return X.loc[valid_idx].copy(), y.loc[valid_idx].copy()
 
 def build_preprocessor(X):
     numeric_features = X.select_dtypes(include=["number"]).columns.tolist()
@@ -83,196 +57,152 @@ def build_preprocessor(X):
 
     categorical_transformer = Pipeline(steps=[
         ("imputer", SimpleImputer(strategy="most_frequent")),
-        ("onehot", OneHotEncoder(handle_unknown="ignore"))
+        ("onehot", OneHotEncoder(drop='first', handle_unknown="ignore", sparse_output=False))
     ])
 
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ("num", numeric_transformer, numeric_features),
-            ("cat", categorical_transformer, categorical_features),
-        ]
-    )
-
+    preprocessor = ColumnTransformer(transformers=[
+        ("num", numeric_transformer, numeric_features),
+        ("cat", categorical_transformer, categorical_features),
+    ])
+    
     return preprocessor, numeric_features, categorical_features
-
-
-def train_models(X, y):
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
-
-    preprocessor, numeric_features, categorical_features = build_preprocessor(X)
-
-    # 1) Linear Regression
-    linear_model = Pipeline(steps=[
-        ("preprocessor", preprocessor),
-        ("regressor", LinearRegression())
-    ])
-
-    linear_model.fit(X_train, y_train)
-    linear_preds = linear_model.predict(X_test)
-
-    # 2) Quadratic Regression
-    # PolynomialFeatures degree=2 after preprocessing
-    quadratic_model = Pipeline(steps=[
-        ("preprocessor", preprocessor),
-        ("poly", PolynomialFeatures(degree=2, include_bias=False)),
-        ("regressor", LinearRegression())
-    ])
-
-    quadratic_model.fit(X_train, y_train)
-    quadratic_preds = quadratic_model.predict(X_test)
-
-    linear_metrics = evaluate_regression(y_test, linear_preds)
-    quadratic_metrics = evaluate_regression(y_test, quadratic_preds)
-
-    return {
-        "linear_model": linear_model,
-        "quadratic_model": quadratic_model,
-        "linear_metrics": linear_metrics,
-        "quadratic_metrics": quadratic_metrics,
-        "X_train": X_train,
-        "X_test": X_test,
-        "y_train": y_train,
-        "y_test": y_test,
-        "linear_preds": linear_preds,
-        "quadratic_preds": quadratic_preds,
-        "numeric_features": numeric_features,
-        "categorical_features": categorical_features,
-    }
-
-
-def evaluate_regression(y_true, y_pred):
-    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
-    mae = mean_absolute_error(y_true, y_pred)
-    r2 = r2_score(y_true, y_pred)
-    return {
-        "RMSE": rmse,
-        "MAE": mae,
-        "R2": r2
-    }
-
 
 @st.cache_resource
 def load_and_train():
     df = load_data().copy()
     X, y = prepare_dataset(df)
-    results = train_models(X, y)
-    return df, X, y, results
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    
+    preprocessor, num_feats, cat_feats = build_preprocessor(X)
 
+    # Model 1: Linear Regression
+    lin_model = Pipeline([("prep", preprocessor), ("reg", LinearRegression())])
+    lin_model.fit(X_train, y_train)
+    
+    # Model 2: Quadratic Regression
+    quad_model = Pipeline([("prep", preprocessor), ("poly", PolynomialFeatures(2)), ("reg", LinearRegression())])
+    quad_model.fit(X_train, y_train)
 
-# -------------------------
-# Load data and train
-# -------------------------
-df, X, y, results = load_and_train()
+    return df, X, y, lin_model, quad_model, X_train, y_train, X_test, y_test, num_feats, cat_feats
 
-linear_model = results["linear_model"]
-quadratic_model = results["quadratic_model"]
-linear_metrics = results["linear_metrics"]
-quadratic_metrics = results["quadratic_metrics"]
-numeric_features = results["numeric_features"]
-categorical_features = results["categorical_features"]
-
-# -------------------------
-# Page
-# -------------------------
-st.title("Salary Prediction with Regression Models")
-
-st.write(
-    """
-This page compares two regression models for predicting `annual_salary_usd`:
-- Linear Regression
-- Quadratic Regression
-
-The target-leakage columns (`salary_min_usd`, `salary_max_usd`, `salary_tier`) are excluded.
-"""
-)
+# Execute Training
+df, X, y, lin_model, quad_model, X_train, y_train, X_test, y_test, num_feats, cat_feats = load_and_train()
 
 # -------------------------
-# Metrics
+# 2. Performance Comparison Metrics
 # -------------------------
-st.subheader("Model Performance on Test Set")
+st.title("Salary Prediction Model Comparison")
 
+lin_preds = lin_model.predict(X_test)
+quad_preds = quad_model.predict(X_test)
+
+metrics_df = pd.DataFrame({
+    "Metric": ["RMSE", "MAE", "R2"],
+    "Linear Regression": [
+        np.sqrt(mean_squared_error(y_test, lin_preds)),
+        mean_absolute_error(y_test, lin_preds),
+        r2_score(y_test, lin_preds)
+    ],
+    "Quadratic Regression": [
+        np.sqrt(mean_squared_error(y_test, quad_preds)),
+        mean_absolute_error(y_test, quad_preds),
+        r2_score(y_test, quad_preds)
+    ]
+}).set_index("Metric")
+
+# HIGHLIGHTING LOGIC: Green for better performance
+def highlight_best(row):
+    if row.name in ["RMSE", "MAE"]:
+        best_val = row.min()
+    else: # For R2
+        best_val = row.max()
+    return ['background-color: #1e4620; color: white' if v == best_val else '' for v in row]
+
+styled_df = metrics_df.style.apply(highlight_best, axis=1).format("{:,.2f}")
+
+st.subheader("📊 Model Performance Comparison")
 c1, c2, c3 = st.columns(3)
-with c1:
-    st.metric("Linear RMSE", f"{linear_metrics['RMSE']:,.0f}")
-with c2:
-    st.metric("Linear MAE", f"{linear_metrics['MAE']:,.0f}")
-with c3:
-    st.metric("Linear R²", f"{linear_metrics['R2']:.3f}")
+with c1: st.metric("Top R² Score", f"{metrics_df.loc['R2'].max():.3f}")
+with c2: st.metric("Best RMSE", f"${metrics_df.loc['RMSE'].min():,.0f}")
+with c3: st.metric("Best MAE", f"${metrics_df.loc['MAE'].min():,.0f}")
 
-c4, c5, c6 = st.columns(3)
-with c4:
-    st.metric("Quadratic RMSE", f"{quadratic_metrics['RMSE']:,.0f}")
-with c5:
-    st.metric("Quadratic MAE", f"{quadratic_metrics['MAE']:,.0f}")
-with c6:
-    st.metric("Quadratic R²", f"{quadratic_metrics['R2']:.3f}")
+st.dataframe(styled_df, use_container_width=True)
+
+st.markdown("---")
+st.subheader("📝 Metric Definitions & Interpretation")
+
+with st.expander("What do these metrics mean for my salary prediction?"):
+    st.markdown(f"""
+    * **RMSE (${metrics_df.loc['RMSE'].min():,.2f}):** The standard deviation of prediction errors. It penalizes large outliers.
+    * **MAE (${metrics_df.loc['MAE'].min():,.2f}):** The average 'dollar amount' error per prediction.
+    * **$R^2$ ({metrics_df.loc['R2'].max():.1%}):** The percentage of salary variation explained by the model features.
+    """)
+    st.info("The green highlight indicates the winning model for each metric.")
 
 # -------------------------
-# Comparison table
+# 3. Interactive Prediction
 # -------------------------
 st.markdown("---")
-st.subheader("Performance Comparison")
+st.subheader("🎯 Final Salary Prediction")
 
-comparison_df = pd.DataFrame({
-    "Model": ["Linear Regression", "Quadratic Regression"],
-    "RMSE": [linear_metrics["RMSE"], quadratic_metrics["RMSE"]],
-    "MAE": [linear_metrics["MAE"], quadratic_metrics["MAE"]],
-    "R2": [linear_metrics["R2"], quadratic_metrics["R2"]],
-})
+row1_col1, row1_col2 = st.columns(2)
+row2_col1, row2_col2 = st.columns(2)
 
-st.dataframe(comparison_df, use_container_width=True)
+# Geography Logic
+countries = sorted(X['country'].unique())
+selected_country = row1_col1.selectbox("Select Country", options=countries)
+available_cities = sorted(X[X['country'] == selected_country]['city'].unique())
+selected_city = row1_col2.selectbox("Select City", options=available_cities)
+
+# Job Category Logic
+category_options = ["All Categories"] + sorted(X['job_category'].unique().tolist())
+selected_category = row2_col1.selectbox("Select Job Category", options=category_options)
+
+if selected_category == "All Categories":
+    available_titles = sorted(X['job_title'].unique())
+else:
+    available_titles = sorted(X[X['job_category'] == selected_category]['job_title'].unique())
+selected_title = row2_col2.selectbox("Select Job Title", options=available_titles)
+
+with st.form("prediction_form"):
+    actual_category = selected_category
+    if selected_category == "All Categories":
+        actual_category = X[X['job_title'] == selected_title]['job_category'].iloc[0]
+
+    input_data = {
+        'country': selected_country, 'city': selected_city,
+        'job_category': actual_category, 'job_title': selected_title
+    }
+
+    c1, c2 = st.columns(2)
+    input_data['years_of_experience'] = c1.number_input("Years of Experience", value=6.0)
+    input_data['posting_month'] = c2.slider("Posting Month", 1, 12, 3)
+    input_data['experience_level'] = c1.selectbox("Experience Level", options=sorted(X['experience_level'].unique()))
+    input_data['education_required'] = c2.selectbox("Education Required", options=sorted(X['education_required'].unique()))
+    input_data['is_remote_friendly'] = c1.selectbox("Is Remote Friendly?", options=[1, 0], format_func=lambda x: "Yes (1)" if x == 1 else "No (0)")
+    input_data['remote_work'] = c2.selectbox("Remote Work Type", options=sorted(X['remote_work'].unique()))
+    input_data['industry'] = c1.selectbox("Industry", options=sorted(X['industry'].unique()))
+    input_data['company_size'] = c2.selectbox("Company Size", options=sorted(X['company_size'].unique()))
+    
+    # Handling missing fields from curated list if necessary (e.g. demand_score)
+    if "demand_score" in X.columns:
+        input_data['demand_score'] = c1.number_input("Demand Score", value=float(X['demand_score'].median()))
+    if "ai_salary_premium_pct" in X.columns:
+        input_data['ai_salary_premium_pct'] = c2.number_input("AI Salary Premium %", value=15.0)
+
+    predict_submit = st.form_submit_button("Predict Salary")
+
+if predict_submit:
+    input_df = pd.DataFrame([input_data])[X.columns]
+    final_lin = lin_model.predict(input_df)[0]
+    final_quad = quad_model.predict(input_df)[0]
+    
+    st.success(f"Linear Prediction: **${final_lin:,.0f}**")
+    st.info(f"Quadratic Prediction: **${final_quad:,.0f}**")
 
 # -------------------------
-# Prediction form
+# 4. Data Preview
 # -------------------------
 st.markdown("---")
-st.subheader("Try a Salary Prediction")
-
-with st.form("salary_prediction_form"):
-    input_data = {}
-
-    st.markdown("### Numeric Inputs")
-    num_cols = st.columns(2)
-    for i, col in enumerate(numeric_features):
-        median_value = float(X[col].median()) if pd.api.types.is_numeric_dtype(X[col]) else 0.0
-        input_data[col] = num_cols[i % 2].number_input(
-            col,
-            value=median_value
-        )
-
-    st.markdown("### Categorical Inputs")
-    cat_cols = st.columns(2)
-    for i, col in enumerate(categorical_features):
-        options = sorted([v for v in X[col].dropna().astype(str).unique().tolist()])
-        default_value = options[0] if options else ""
-        input_data[col] = cat_cols[i % 2].selectbox(
-            col,
-            options=options,
-            index=0 if options else None
-        )
-
-    submitted = st.form_submit_button("Predict Salary")
-
-if submitted:
-    input_df = pd.DataFrame([input_data])
-
-    linear_salary = linear_model.predict(input_df)[0]
-    quadratic_salary = quadratic_model.predict(input_df)[0]
-
-    st.success("Prediction completed")
-
-    p1, p2 = st.columns(2)
-    with p1:
-        st.metric("Linear Regression Prediction", f"${linear_salary:,.0f}")
-    with p2:
-        st.metric("Quadratic Regression Prediction", f"${quadratic_salary:,.0f}")
-
-# -------------------------
-# Preview
-# -------------------------
-st.markdown("---")
-st.subheader("Model Input Preview")
-preview_cols = [c for c in X.columns[:10]]
-st.dataframe(pd.concat([X[preview_cols].head(10), y.head(10)], axis=1), use_container_width=True)
+st.subheader("Processed Model Input Preview")
+st.dataframe(X.head(5), use_container_width=True)
