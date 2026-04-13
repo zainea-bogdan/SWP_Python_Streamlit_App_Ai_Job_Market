@@ -1,15 +1,3 @@
-"""
-General Visualisations:
-    - Histogram (distribution + outliers, filter per column)
-    - Pie chart (salary tiers)
-    - Bar chart (job posts by year + growth metric)
-    - Scatter plot (experience vs category/title)
-    - Line chart (monthly demand trend with filters)
-    - Skills frequency bar chart (+ top N + selected skills)
-    - Bubble chart (demand score vs salary, size=growth, color=LLM binary)
-    - Interpretation section
-"""
-
 import re
 import numpy as np
 import pandas as pd
@@ -17,9 +5,11 @@ import streamlit as st
 import plotly.express as px
 from streamlit_extras.let_it_rain import rain
 
-st.set_page_config(page_title="General Visualisations", page_icon="📈", layout="wide")
-st.title("📈 General Visualisations")
+st.set_page_config(page_title="General Visualisations", layout="wide")
+st.title(" General Visualisations")
 
+
+# Am ales sa facem si aici functia de incarcare a datelor intrucat sa nu existe riscul ca daca o importam din home sa ne incarce cumva si pagina de home cu totul (testat ca se intamplat asta :) ) 
 @st.cache_data
 def load_data():
     file_path = "./EDA/ai_jobs_market_2025_2026.csv"
@@ -29,22 +19,28 @@ def load_data():
         st.error(f"Fișierul '{file_path}' nu a fost găsit.")
         return pd.DataFrame()
 
+# aceasta functie contributie la selectia coloanelor care exista in dataframe si pe care le dam noi ca fiind cele dorite.
 def pick_col(df: pd.DataFrame, candidates: list[str]):
     for c in candidates:
         if c in df.columns:
             return c
     return None
 
+# aceasta functie imi intoarce o serie de true sau false pentru acele coloane care sunt variabile categorialesi care trebuie converite in true sau false
 def to_bool_series(s: pd.Series) -> pd.Series:
     return s.astype(str).str.lower().isin(["1", "true", "yes", "y", "llm", "t"])
 
+#========================================
+
+# Aici este intrare in pagina de general Vizs in care exploram mai multe vizualirile si asa mai departe. Prima data as usual incarcam datele si daca cumva nu avem nimic in dataframe oprim rularea pagini
 df = load_data()
 if df.empty:
     st.stop()
-
-# --- Optional rain effect ---
-rain_mode = st.radio("Rain effect", ["Off", "On"], index=0, horizontal=True)
-if rain_mode == "On":
+st.divider()
+# Odata cu venirea primavaeri am ales sa introducem si un mic efect cute in cazul in care vreti sa simti the cherry blossom season in our app :)
+st.subheader("Do you like Cherry Blossoms?")
+rain_mode = st.radio("Choose carefully: ", ["No", "Yes"], index=0, horizontal=True)
+if rain_mode == "Yes":
     rain(emoji="🌸", font_size=42, falling_speed=5, animation_length="infinite")
 
 # Resolve columns (more robust)
@@ -86,38 +82,61 @@ num_cols_all = filtered.select_dtypes(include=[np.number]).columns.tolist()
 obj_cols_all = filtered.select_dtypes(exclude=[np.number]).columns.tolist()
 
 
-
-st.subheader("Histogram - distribution & outliers")
-if num_cols_all:
-    hist_col = st.selectbox("Numeric column", num_cols_all, index=0, key="hist_col_tab")
-    bins = st.slider("Bins", 10, 100, 35, key="hist_bins_tab")
-    fig_hist = px.histogram(filtered, x=hist_col, nbins=bins, title=f"Distribution of {hist_col}")
-    st.plotly_chart(fig_hist, width="stretch")
-
-    s = pd.to_numeric(filtered[hist_col], errors="coerce").dropna()
-    if len(s) > 5:
-        q1, q3 = s.quantile(0.25), s.quantile(0.75)
-        iqr = q3 - q1
-        low, high = q1 - 1.5 * iqr, q3 + 1.5 * iqr
-        outliers = ((s < low) | (s > high)).sum()
-        st.caption(f"Outliers (IQR): {outliers} | Range: [{low:,.2f}, {high:,.2f}]")
-else:
-    st.info("Nu există coloane numerice.")
-
 st.divider()
 
-st.subheader("Pie Chart - salary tiers")
+st.subheader("Distribuția Categoriilor de Salarii - pe Quartile")
+
 if salary_col:
     tmp = filtered[[salary_col]].copy()
     tmp[salary_col] = pd.to_numeric(tmp[salary_col], errors="coerce")
     tmp = tmp.dropna(subset=[salary_col])
+    
     if not tmp.empty:
+        # 1. Calcularea Tier-urilor
         tmp["salary_tier"] = pd.qcut(tmp[salary_col], q=4, labels=["Low", "Mid", "High", "Elite"], duplicates="drop")
         pie_df = tmp["salary_tier"].value_counts().reset_index()
         pie_df.columns = ["salary_tier", "count"]
-        fig_pie = px.pie(pie_df, names="salary_tier", values="count", title="Salary tiers distribution")
-        fig_pie.update_traces(textposition="inside", textinfo="percent+label")
-        st.plotly_chart(fig_pie, width="stretch")
+        
+        # 2. Definirea culorilor pentru un aspect profesional
+        color_map = {
+            "Low": "#E74C3C",    # Roșu
+            "Mid": "#F39C12",    # Portocaliu
+            "High": "#3498DB",   # Albastru
+            "Elite": "#27AE60"   # Verde
+        }
+
+        # 3. Crearea graficului tip Donut (hole=0.4)
+        fig_pie = px.pie(
+            pie_df, 
+            names="salary_tier", 
+            values="count", 
+            title="Distribuția pe Nivele Salariale",
+            color="salary_tier",
+            color_discrete_map=color_map,
+            hole=0.4,  # Transformă Pie în Donut
+            height=600
+        )
+        
+        fig_pie.update_traces(
+            textposition="inside", 
+            textinfo="percent+label",
+            marker=dict(line=dict(color='#000000', width=2)) # Border pentru contrast
+        )
+        
+        fig_pie.update_layout(
+            legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5),
+            margin=dict(t=50, b=20, l=20, r=20)
+        )
+
+        st.plotly_chart(fig_pie, use_container_width=True)
+
+        # 4. Insights îmbunătățite
+        st.info(f"""
+        ### 💡 Insights:
+        * **Confirmare Date Sintetice:** Observăm o distribuție perfect egală de **25%** pentru fiecare categorie. Acest lucru apare deoarece am folosit `pd.qcut`, care împarte datele în segmente egale bazate pe numărul de înregistrări (quartile).
+        * **Praguri Salariale:** Într-un set de date reale, am vedea o "cocoașă" în zona de Mid/High și mult mai puține înregistrări la Elite. Aici, echilibrul perfect sugerează o generare algoritmică menită să acopere toate intervalele uniform.
+        * **Utilitate:** Această împărțire ne ajută să vedem care sunt joburile care reușesc să "sară" în top 25% (Elite) indiferent de volumul total de date.
+        """)
     else:
         st.info("Nu există salarii valide.")
 else:
@@ -125,38 +144,96 @@ else:
 
 st.divider()
 
-st.subheader("Bar Chart - number of job posts by year")
+st.subheader("Bar Chart - Numarul de joburi cu AI, in 2026 fata de 2025")
 if year_col:
     year_counts = filtered[year_col].dropna().astype(int).value_counts().sort_index().reset_index()
     year_counts.columns = ["year", "posts"]
     fig_year = px.bar(year_counts, x="year", y="posts", text="posts", title="Job posts per year")
-    st.plotly_chart(fig_year, width="stretch")
+    st.plotly_chart(fig_year, use_container_width=True) # Changed from width="stretch" to the standard parameter
 
     if len(year_counts) >= 2 and year_counts.iloc[0]["posts"] > 0:
         first, last = year_counts.iloc[0], year_counts.iloc[-1]
         growth_pct = ((last["posts"] - first["posts"]) / first["posts"]) * 100
-        st.metric("Growth from first to last year", f"{growth_pct:+.1f}%")
+        st.metric(
+            label="Growth from first to last year", 
+            value=f"{last['posts']} Posts", 
+            delta=f"{growth_pct:+.1f}%"
+        )
 else:
     st.info("Nu există coloană de an.")
 
 st.divider()
 
-st.subheader("Scatterplot - experience vs category/title")
-scatter_x_default = exp_col if exp_col in num_cols_all else (num_cols_all[0] if num_cols_all else None)
+st.subheader("Scatterplot - Raportarea Categoriei de Joburi in relatie cu salariul anual")
+
+# 1. Definirea coloanelor favorite
+fav_x = "annual_salary_usd"
+fav_y = "job_category"
+
+# Opțiunile pentru Y (deja calculate de tine)
 scatter_y_options = [c for c in [job_cat_col, job_title_col] if c] or obj_cols_all
 
-if scatter_x_default and scatter_y_options:
-    x_col = st.selectbox("X (numeric)", num_cols_all, index=num_cols_all.index(scatter_x_default), key="sc_x")
-    y_col = st.selectbox("Y (category/title)", scatter_y_options, index=0, key="sc_y")
+if num_cols_all and scatter_y_options:
+    # 2. Calcularea indexului pentru X (annual_salary_usd)
+    try:
+        default_ix_x = num_cols_all.index(fav_x)
+    except ValueError:
+        default_ix_x = 0
 
+    # 3. Calcularea indexului pentru Y (job_category)
+    try:
+        default_ix_y = scatter_y_options.index(fav_y)
+    except ValueError:
+        default_ix_y = 0
+
+    # 4. Crearea selectbox-urilor cu valorile default setate
+    c1, c2 = st.columns(2)
+    with c1:
+        x_col = st.selectbox("Selectează axa X (Numeric)", num_cols_all, index=default_ix_x, key="sc_x")
+    with c2:
+        y_col = st.selectbox("Selectează axa Y (Categorie)", scatter_y_options, index=default_ix_y, key="sc_y")
+
+    # 5. Pregătirea datelor
     sc_df = filtered[[x_col, y_col]].copy()
     sc_df[x_col] = pd.to_numeric(sc_df[x_col], errors="coerce")
     sc_df = sc_df.dropna(subset=[x_col, y_col])
+    
+    # Sortăm după salariu pentru a ajuta vizualizarea dacă e cazul
+    sc_df = sc_df.sort_values(by=x_col)
 
-    fig_sc = px.scatter(sc_df, x=x_col, y=y_col, color=y_col, opacity=0.7, title=f"{x_col} vs {y_col}")
-    st.plotly_chart(fig_sc, width="stretch")
+    # 6. Generarea graficului
+    fig_sc = px.scatter(
+        sc_df, 
+        x=x_col, 
+        y=y_col, 
+        color=y_col, 
+        opacity=0.7, 
+        height=600, # Am mărit înălțimea pentru lizibilitate
+        title=f"Analiză: {x_col} vs {y_col}",
+        labels={x_col: "Salariu Anual (USD)", y_col: "Categorie Job"}
+    )
+    
+    # Îmbunătățiri vizuale
+    fig_sc.update_layout(showlegend=False) # Legendă ascunsă dacă culorile sunt pe Y
+    fig_sc.update_yaxes(categoryorder="total ascending") # Ordonare după volumul de date
+
+    st.plotly_chart(fig_sc, use_container_width=True)
+
+    # --- Secțiunea de Insights ---
+    st.info("""
+    ### 💡 Insights:
+    1. **Discrepante in Guvernanta Datelor si "AI Gold Rush":**
+        Putem observa ca desi cam toata lumea vrea roluri de "AI Engineer", nu se acorda suficienta atentie **GUVERNANTEI** datelor. Fara date curate si mascate adecvat, AI-ul nu poate oferi raspunsuri de calitate.
+    
+    2. **Discrepante intre "Shiny Objects" si roluri esentiale:** Exista o balanta fragila; AI Engineers ating praguri de 380k USD, in timp ce Data Engineers (fara de care AI-ul nu ar avea date) plafoneaza mult mai jos (270k-280k). Rolurile de Data Governance sunt si mai subevaluate.
+    
+    3. **LLM e baza:** Predominanta rolurilor de LLM Engineer fata de AI Solution Architects sau Data Engineers este un semn clar al trendului actual de piata.
+    
+    4. **Note:** Aceste date sunt un semnal de alarma asupra problemelor de structura din departamentele de date care ar putea fi mascate de hype-ul actual.
+    """)
+
 else:
-    st.warning(f"Nu am suficiente coloane pentru scatter. Numerice: {num_cols_all}")
+    st.warning("Nu am suficiente coloane pentru a genera graficul.")
 
 st.divider()
 
@@ -255,20 +332,3 @@ else:
 
 st.divider()
 
-st.subheader("Interpretation")
-c1, c2 = st.columns(2)
-with c1:
-    if salary_col and salary_col in filtered.columns:
-        s = pd.to_numeric(filtered[salary_col], errors="coerce")
-        st.markdown(f"- Average salary: **${s.mean():,.0f}**")
-        st.markdown(f"- Median salary: **${s.median():,.0f}**")
-    st.markdown(f"- Total filtered posts: **{len(filtered):,}**")
-with c2:
-    if demand_col and demand_col in filtered.columns:
-        d = pd.to_numeric(filtered[demand_col], errors="coerce")
-        st.markdown(f"- Mean demand score: **{d.mean():.2f}**")
-    if job_title_col and job_title_col in filtered.columns:
-        top_role = filtered[job_title_col].astype(str).value_counts().head(1)
-        if len(top_role):
-            st.markdown(f"- Most frequent role: **{top_role.index[0]}** ({int(top_role.iloc[0])} posts)")
-    st.markdown("- Compare tabs using sidebar filters for consistent insights.")
