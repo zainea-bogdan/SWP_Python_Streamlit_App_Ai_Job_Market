@@ -1,20 +1,3 @@
-"""
-This page is intended to show the following:
-    - * Choropleth Graph - Geo discrepancies : vizs the number of roles per country/city + filters of other aspects.
-        - for lat and long data below are some methods:
-            - | Service                 | API key | Free tier    | Notes               |
-              | ----------------------- | ------- | ------------ | ------------------- |
-              | OpenStreetMap Nominatim | ❌ No    | Yes          | Very common, simple |
-              | OpenCage                | ✅ Yes   | 2,500/day    | Easy JSON response  |
-              | Mapbox Geocoding        | ✅ Yes   | 100k/month   | High quality        |
-              | Google Geocoding        | ✅ Yes   | Limited free | Requires billing    |
-
-    - Sunburst graphic: at industry level, to see repartition (%) of job category + number per category.
-        - filter to choose the second category: job category % / job title.    
-    - Sunburst graphic to vizualise % of unique skills required per job title. 
-    - Interpretation Sections with general conclusions.
-"""
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -22,39 +5,7 @@ import requests
 import time
 
 st.set_page_config(page_title="Advanced Visualisations", layout="wide")
-st.title("📊 Advanced Visualisations")
-
-@st.cache_data(ttl=7 * 24 * 3600, show_spinner=False)
-def geocode_cities_google(city_country_pairs, api_key: str) -> pd.DataFrame:
-    """
-    city_country_pairs: tuple de tuple (city, country)
-    Returnează DataFrame cu: city, country, latitude, longitude
-    """
-    out = []
-    for city, country in city_country_pairs:
-        address = f"{city}, {country}" if country else city
-        try:
-            r = requests.get(
-                "https://maps.googleapis.com/maps/api/geocode/json",
-                params={"address": address, "key": api_key},
-                timeout=12,
-            )
-            data = r.json()
-            if data.get("status") == "OK" and data.get("results"):
-                loc = data["results"][0]["geometry"]["location"]
-                out.append(
-                    {
-                        "city": city,
-                        "country": country,
-                        "latitude": float(loc["lat"]),
-                        "longitude": float(loc["lng"]),
-                    }
-                )
-        except Exception:
-            pass
-        time.sleep(0.03)  # mic throttle
-
-    return pd.DataFrame(out)
+st.title("Advanced Visualisations")
 
 @st.cache_data
 def load_data():
@@ -127,31 +78,43 @@ country_counts = (
 _gap = px.data.gapminder()[["country", "iso_alpha"]].drop_duplicates()
 _country_to_iso3 = dict(zip(_gap["country"], _gap["iso_alpha"]))
 _alias_iso3 = {
-    "United States": "USA",
+    # Asia & Middle East (Locațiile tale cheie)
+    "Singapore": "SGP",
+    "UAE": "ARE",
+    "United Arab Emirates": "ARE",
+    "Japan": "JPN",
+    "China": "CHN",
+    "India": "IND",
+    
+    # Europe
+    "UK": "GBR",
     "United Kingdom": "GBR",
+    "Germany": "DEU",
+    "France": "FRA",
+    "Netherlands": "NLD",
+    "Switzerland": "CHE",
+    
+    # North America & Oceania
+    "USA": "USA",
+    "United States": "USA",
+    "Canada": "CAN",
+    "Australia": "AUS",
+    
+    # Fallbacks pentru siguranță
     "Russia": "RUS",
-    "South Korea": "KOR",
-    "North Korea": "PRK",
-    "Czech Republic": "CZE",
-    "Vietnam": "VNM",
-    "Iran": "IRN",
-    "Venezuela": "VEN",
-    "Bolivia": "BOL",
-    "Tanzania": "TZA",
-    "Syria": "SYR",
-    "Moldova": "MDA",
-    "Laos": "LAO",
-    "Brunei": "BRN",
-    "Taiwan": "TWN",
-    "Palestine": "PSE",
-    "Micronesia": "FSM",
-    "Democratic Republic of the Congo": "COD",
-    "Republic of the Congo": "COG",
-    "Ivory Coast": "CIV",
-    "Cape Verde": "CPV",
-    "Swaziland": "SWZ",
-    "Myanmar": "MMR",
+    "South Korea": "KOR"
 }
+
+# Aplicare mapare
+country_counts["iso3"] = country_counts["country"].map(_country_to_iso3)
+country_counts["iso3"] = country_counts["iso3"].fillna(country_counts["country"].map(_alias_iso3))
+
+# --- IMPORTANT: Debugging pentru a vedea ce nu apare ---
+missing_countries = country_counts[country_counts["iso3"].isna()]["country"].unique()
+if len(missing_countries) > 0:
+    st.warning(f"⚠️ Următoarele țări nu sunt mapate corect și nu vor apărea pe hartă: {missing_countries}")
+
+
 country_counts["iso3"] = country_counts["country"].map(_country_to_iso3)
 country_counts["iso3"] = country_counts["iso3"].fillna(country_counts["country"].map(_alias_iso3))
 country_counts = country_counts.dropna(subset=["iso3"])
@@ -162,14 +125,16 @@ fig_map = px.choropleth(
     locationmode="ISO-3",
     color="roles_count",
     hover_name="country",
-    color_continuous_scale="Blues",
+    color_continuous_scale="Blues", # Păstrăm scara de albastru
+    # --- ADAUGĂ ACEASTĂ LINIE pentru a face scara logaritmică ---
+    color_continuous_midpoint=country_counts["roles_count"].median(), # Ajută la contrast
     title="Număr de joburi AI/ML per țară"
 )
 fig_map.update_layout(margin=dict(l=10, r=10, t=60, b=10))
 st.plotly_chart(fig_map, width="stretch")
 
 # --- Globe interactiv pe baza lat/lon ---
-st.markdown("### 🌐 Glob interactiv - selecție orașe (lat/lon)")
+st.markdown("### 🌐 Glob interactiv - selecție orașe")
 
 @st.cache_data(ttl=7 * 24 * 3600, show_spinner=False)
 def geocode_cities_nominatim(city_country_pairs) -> pd.DataFrame:
@@ -477,13 +442,10 @@ top_role = filtered["job_title"].value_counts().head(1)
 median_salary = filtered["annual_salary_usd"].median()
 
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("Țara dominantă", top_country["country"].iloc[0] if not top_country.empty else "-")
+c1.metric("Țara dominantă ca numarul de roluri", top_country["country"].iloc[0] if not top_country.empty else "-")
 c2.metric("Industria dominantă", top_industry.index[0] if len(top_industry) else "-")
 c3.metric("Rol dominant", top_role.index[0] if len(top_role) else "-")
 c4.metric("Median salary (USD)", f"{median_salary:,.0f}")
 
-st.info(
-    "Concluzie: distribuția geografică și structura rolurilor diferă semnificativ în funcție de industrie, "
-    "nivel de experiență și politica remote. Folosește filtrele pentru a observa schimbări locale."
-)
+
 

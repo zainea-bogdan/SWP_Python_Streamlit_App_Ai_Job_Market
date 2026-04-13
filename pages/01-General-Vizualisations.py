@@ -252,7 +252,7 @@ if month_col and demand_col:
 
     if filter_col:
         opts = sorted(line_df[filter_col].dropna().astype(str).unique().tolist())
-        selected = st.multiselect(f"Filter {filter_col}", opts, default=opts[:5] if opts else [])
+        selected = st.multiselect(f"Filter {filter_col}", opts)
         if selected:
             line_df = line_df[line_df[filter_col].astype(str).isin(selected)]
 
@@ -261,6 +261,22 @@ if month_col and demand_col:
     st.plotly_chart(fig_line, width="stretch")
 else:
     st.info("Lipsesc coloane pentru month + demand.")
+
+st.info("""
+    ### 💡 Insights:
+    
+    1. **Lunile cele mai prielnice pentru Joburi cu AI:**
+        * **Fereastra de Primăvară (Feb-Mai):** Dacă privim media generală (fără a filtra un rol specific), observăm un **Demand Score mediu de aproximativ 88%** care se menține constant. Aceasta pare să fie „epoca de aur” a angajărilor.
+        * **Realitatea Financiară:** Acest trend, pe care l-am observat și noi monitorizând piața IT, se datorează deschiderii **bugetelor pentru noul an financiar**. Pozițiile se deschid în februarie și se ocupă treptat până la începutul verii, când fereastra tinde să se închidă.
+        * **„Spike-ul” de Septembrie:** Apare o ultimă portiță de angajare după perioada concediilor. Acest lucru coincide adesea cu finalizarea perioadelor de probă din primăvară; dacă cineva nu a confirmat, locul se scoate din nou la concurs înainte de înghețul de iarnă.
+        * **Consecvență:** Aceste date sunt valabile pentru intervalul **2025-2026 cumulat**, iar analiza individuală pe ani confirmă acest comportament ciclic.
+
+    2. **Amprenta Datelor Sintetice:**
+        * **Stagnarea pe Roluri Specifice:** Există un semnal de alarmă în date: dacă filtrăm un singur job, observăm că acesta își păstrează Demand Score-ul aproape plat pe tot anul. 
+        * **Scepticism:** În realitate, acest lucru este puțin probabil. Ar putea însemna fie un caz ideal (postări constante), fie o rată de reciclare foarte mare a personalului (angajați care se dovedesc subpregătiți și sunt înlocuiți rapid). Totuși, cel mai probabil, este un indicator clar că **datele sunt sintetice**, neavând „zgomotul” sau fluctuațiile bruște pe care le-am vedea într-o piață reală, imprevizibilă.
+    """)
+
+
 
 st.divider()
 
@@ -288,47 +304,70 @@ if skills_col:
 else:
     st.info("Nu există coloană de skill-uri.")
 
-st.divider()
+st.info("""
+    ### 💡 Insights:
+    
+    1. **Python este fundamentul, SQL este structura:**
+        * **Python:** Așa cum era de așteptat, Python este de departe cel mai critic skill. În acest grafic, el apare ca motorul principal pentru orice rol de AI sau Machine Learning.
+        * **SQL ("The Bone"):** Nu este de neglijat faptul că SQL își păstrează poziția imediat sub Python. Este, așa cum îmi place să spun, *"the bone of the data world"* (Bogdan 2026). Fără el, capacitatea de a interoga milioane de rânduri din bazele de date ar fi imposibilă.
+        * **Cloud-ul în Top 3:** Observăm o prezență masivă a sistemelor Cloud. Este un trend clar: sistemele *on-premise* migrează către Cloud pentru ca companiile să rămână competitive și scalabile.
 
-st.subheader("Bubble chart - demand score x salary")
-if len(num_cols_all) >= 3:
-    # defaults if detected, otherwise fallback to first numeric cols
-    x_default = demand_col if demand_col in num_cols_all else num_cols_all[0]
-    y_default = salary_col if salary_col in num_cols_all else num_cols_all[min(1, len(num_cols_all)-1)]
-    s_default = growth_col if growth_col in num_cols_all else num_cols_all[min(2, len(num_cols_all)-1)]
+    2. **Surpriza Soft Skill-urilor – "Still there!":**
+        Deși vorbim de un domeniu ultra-tehnic, următoarele 3-4 skill-uri din top sunt, surprinzător, non-tehnice:
+        * **Leadership:** Companiile caută oameni care să își asume livrabilele și să fie capabili de auto-gestionare, dar și de ghidarea colegilor cu care colaborează.
+        * **Communication:** Poți fi "doxă" pe tehnic, dar dacă nu știi să comunici ce vrei să obții sau ce blocaje ai, nicio companie nu te va considera un coechipier ideal.
+        * **Research:** Deși datele sunt sintetice, trendul este real. Pentru a fi competitiv în AI, trebuie să fii mereu la curent cu ce se lansează în piață și să ai fundamentul necesar pentru a aduce plus-valoare.
+        * **Agile:** Standardul modern. Aproape orice proiect de AI din prezent se desfășoară sub umbrela metodologiilor Agile.
 
-    x_col = st.selectbox("X", num_cols_all, index=num_cols_all.index(x_default), key="bub_x")
-    y_col = st.selectbox("Y", num_cols_all, index=num_cols_all.index(y_default), key="bub_y")
-    size_col = st.selectbox("Bubble size", num_cols_all, index=num_cols_all.index(s_default), key="bub_s")
+    3. **Statistica – Intersecția esențială:**
+        * Statistica rămâne puntea dintre tehnic și soft skills. Este un "must-have" pentru oricine lucrează cu date în tech, măcar la un nivel de bază, pentru a înțelege ce se află în spatele algoritmilor.
+    """)
 
-    bub = filtered.copy()
-    for c in [x_col, y_col, size_col]:
-        bub[c] = pd.to_numeric(bub[c], errors="coerce")
-    bub = bub.dropna(subset=[x_col, y_col, size_col])
 
-    # keep bubble sizes positive
-    bub["_bubble_size"] = bub[size_col].abs() + 1e-6
 
-    if llm_col and llm_col in bub.columns:
-        bub["color_group"] = to_bool_series(bub[llm_col]).map({True: "LLM", False: "Non-LLM"})
-    elif job_cat_col and job_cat_col in bub.columns:
-        bub["color_group"] = bub[job_cat_col].astype(str)
-    else:
-        bub["color_group"] = "All"
+# st.divider()
 
-    hover_cols = [c for c in [job_title_col, job_cat_col] if c and c in bub.columns]
-    fig_bub = px.scatter(
-        bub,
-        x=x_col,
-        y=y_col,
-        size="_bubble_size",
-        color="color_group",
-        hover_data=hover_cols,
-        title=f"{x_col} vs {y_col} (size={size_col})",
-    )
-    st.plotly_chart(fig_bub, width="stretch")
-else:
-    st.warning(f"Bubble chart necesită minim 3 coloane numerice. Găsite: {num_cols_all}")
+# st.subheader("Bubble chart - demand score x salary")
+# if len(num_cols_all) >= 3:
+#     # defaults if detected, otherwise fallback to first numeric cols
+#     x_default = demand_col if demand_col in num_cols_all else num_cols_all[0]
+#     y_default = salary_col if salary_col in num_cols_all else num_cols_all[min(1, len(num_cols_all)-1)]
+#     s_default = growth_col if growth_col in num_cols_all else num_cols_all[min(2, len(num_cols_all)-1)]
 
-st.divider()
+#     x_col = st.selectbox("X", num_cols_all, index=num_cols_all.index(x_default), key="bub_x")
+#     y_col = st.selectbox("Y", num_cols_all, index=num_cols_all.index(y_default), key="bub_y")
+#     size_col = st.selectbox("Bubble size", num_cols_all, index=num_cols_all.index(s_default), key="bub_s")
+
+#     bub = filtered.copy()
+#     for c in [x_col, y_col, size_col]:
+#         bub[c] = pd.to_numeric(bub[c], errors="coerce")
+#     bub = bub.dropna(subset=[x_col, y_col, size_col])
+
+#     # keep bubble sizes positive
+#     bub["_bubble_size"] = bub[size_col].abs() + 1e-6
+
+#     if llm_col and llm_col in bub.columns:
+#         bub["color_group"] = to_bool_series(bub[llm_col]).map({True: "LLM", False: "Non-LLM"})
+#     elif job_cat_col and job_cat_col in bub.columns:
+#         bub["color_group"] = bub[job_cat_col].astype(str)
+#     else:
+#         bub["color_group"] = "All"
+
+#     hover_cols = [c for c in [job_title_col, job_cat_col] if c and c in bub.columns]
+#     fig_bub = px.scatter(
+#         bub,
+#         x=x_col,
+#         y=y_col,
+#         size="_bubble_size",
+#         color="color_group",
+#         hover_data=hover_cols,
+#         title=f"{x_col} vs {y_col} (size={size_col})",
+#     )
+#     st.plotly_chart(fig_bub, width="stretch")
+# else:
+#     st.warning(f"Bubble chart necesită minim 3 coloane numerice. Găsite: {num_cols_all}")
+
+
+
+# st.divider()
 

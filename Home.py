@@ -179,7 +179,7 @@ if not df.empty:
 # --- Secțiunea de Concluzii ---
 st.subheader("Curios de ce am observat noi? :)")
 
-with st.expander("Vezi detaliile analizei de tip 'Gold Rush' și 'Paradox'", expanded=True):
+with st.expander("Vezi detaliile analizei proprii", expanded=True):
     st.markdown(f"""
     ### 1. Cele mai frecvente Joburi cu AI
     În urma analizei distribuției pentru **`job_title`**, am observat că top 3 cele mai "căutate" roluri sunt: **LLM Engineer**, **Robotics Engineer (AI)** și **Prompt Engineer**. 
