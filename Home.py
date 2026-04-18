@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 
 # Page configuration
-st.set_page_config(page_title="AI Job Market 2025-2026 Overview", layout="wide")
+st.set_page_config(page_title="AI Job Market 2025-2026 Overview", page_icon="🤖", layout="wide")
 
 
 # Functia de mai jos ajuta citirea csv ului cu date si face un try-catch ca sa vada daca path-ul dat este valid sau nu.
