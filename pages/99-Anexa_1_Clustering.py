@@ -11,10 +11,20 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.cluster import KMeans
-from Home import load_data
 st.set_page_config(page_title="Skill Clustering Demo", layout="centered")
 
 
+
+# Functia de mai jos ajuta citirea csv ului cu date si face un try-catch ca sa vada daca path-ul dat este valid sau nu.
+@st.cache_data
+def load_data():
+    file_path = "./EDA/ai_jobs_market_2025_2026.csv"
+    try:
+        df = pd.read_csv(file_path)
+        return df
+    except FileNotFoundError:
+        st.error(f"Error: The file '{file_path}' was not found. Please ensure it is in the working directory.")
+        return pd.DataFrame()
 
 # -------------------------
 # Clean skills column
@@ -44,8 +54,7 @@ def clean_skills(text):
 # -------------------------
 @st.cache_resource
 def train_clustering():
-    df = load_data().copy()
-
+    df = load_data()
     # imi verific daca am coloana de required skills
     if "required_skills" not in df.columns:
         raise ValueError("Column 'required_skills' not found in dataset.")

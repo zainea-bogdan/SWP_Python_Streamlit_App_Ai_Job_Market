@@ -37,9 +37,8 @@ def prepare_dataset(df):
     
     # 1. Curated Features: Focused on high-impact drivers
     selected_features = [
-        "years_of_experience", "education_required", "job_category", 
-        "is_llm_role", "ai_salary_premium_pct", "country", "city",
-        "company_size", "demand_score", "posting_month", "is_remote_friendly",
+        "years_of_experience", "education_required", "job_category", "country", "city",
+        "company_size", "posting_month",
         "remote_work", "industry", "job_title", "experience_level"
     ]
     
@@ -191,16 +190,9 @@ with st.form("prediction_form"):
     input_data['posting_month'] = c2.slider("Posting Month", 1, 12, 3)
     input_data['experience_level'] = c1.selectbox("Experience Level", options=sorted(X['experience_level'].unique()))
     input_data['education_required'] = c2.selectbox("Education Required", options=sorted(X['education_required'].unique()))
-    input_data['is_remote_friendly'] = c1.selectbox("Is Remote Friendly?", options=[1, 0], format_func=lambda x: "Yes (1)" if x == 1 else "No (0)")
     input_data['remote_work'] = c2.selectbox("Remote Work Type", options=sorted(X['remote_work'].unique()))
     input_data['industry'] = c1.selectbox("Industry", options=sorted(X['industry'].unique()))
     input_data['company_size'] = c2.selectbox("Company Size", options=sorted(X['company_size'].unique()))
-    
-    # Handling missing fields from curated list if necessary (e.g. demand_score)
-    if "demand_score" in X.columns:
-        input_data['demand_score'] = c1.number_input("Demand Score", value=float(X['demand_score'].median()))
-    if "ai_salary_premium_pct" in X.columns:
-        input_data['ai_salary_premium_pct'] = c2.number_input("AI Salary Premium %", value=15.0)
 
     predict_submit = st.form_submit_button("Predict Salary")
 
@@ -212,9 +204,3 @@ if predict_submit:
     st.success(f"Linear Prediction: **${final_lin:,.0f}**")
     st.info(f"Quadratic Prediction: **${final_quad:,.0f}**")
 
-# -------------------------
-# 4. Data Preview
-# -------------------------
-st.markdown("---")
-st.subheader("Processed Model Input Preview")
-st.dataframe(X.head(5), use_container_width=True)
